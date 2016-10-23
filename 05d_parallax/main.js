@@ -29,13 +29,13 @@ var framebufferHeight = 512;
 
 //load the required resources using a utility function
 loadResources({
-  vs: 'shader/normal.vs.glsl',
-  fs: 'shader/normal.fs.glsl',
+  vs: 'shader/parallax.vs.glsl',
+  fs: 'shader/parallax.fs.glsl',
   vs_single: 'shader/single.vs.glsl',
   fs_single: 'shader/single.fs.glsl',
   texture_diffuse: 'models/wood.png',
-  texture_normal:  'models/toy_box_normal.png',
-  texture_height:  'models/toy_box_disp.png',
+  texture_normal: 'models/toy_box_normal.png',
+  texture_height: 'models/toy_box_disp.png',
 }).then(function (resources /*an object containing our keys with the loaded resources*/) {
   init(resources);
 
@@ -88,8 +88,10 @@ function createSceneGraph(gl, resources) {
 
     let floor = new MaterialSGNode(
                 new TextureSGNode(resources.texture_diffuse, 0, 'u_diffuseTex',
+                  new TextureSGNode(resources.texture_normal, 1, 'u_normalTex',
+                    new TextureSGNode(resources.texture_height, 2, 'u_heightTex',
                       new RenderSGNode(makeFloor(1,1))
-                ));
+                ))));
 
     //dark
     floor.ambient = [0, 0, 0, 1];
@@ -166,6 +168,7 @@ function render(timeInMilliseconds) {
   context.viewMatrix = mat4.multiply(mat4.create(), lookAtMatrix, mouseRotateMatrix);
 
   //update animations
+  //EXTRA TASK: animate texture coordinates
   context.timeInMilliseconds = timeInMilliseconds;
 
   rotateLight.matrix = glm.rotateY(timeInMilliseconds*0.05);
