@@ -1,5 +1,5 @@
 /**
- * Created by Clemens Birklbauer on 22.02.2016.
+ *
  */
 'use strict';
 
@@ -56,10 +56,6 @@ function init(resources) {
   //create scenegraph
   root = createSceneGraph(gl, resources);
 
-  //create scenegraph without floor and simple shader
-  rootnofloor = new ShaderSGNode(createProgram(gl, resources.vs_single, resources.fs_single));
-  rootnofloor.append(rotateNode); //reuse model part
-
   initInteraction(gl.canvas);
 }
 
@@ -83,31 +79,12 @@ function createSceneGraph(gl, resources) {
     light.position = [0, 0, 0];
 
     rotateLight = new TransformationSGNode(mat4.create());
-    let translateLight = new TransformationSGNode(glm.translate(0,-2,2)); //translating the light is the same as setting the light position
+    let translateLight = new TransformationSGNode(glm.translate(0,2,2)); //translating the light is the same as setting the light position
 
     rotateLight.append(translateLight);
     translateLight.append(light);
     translateLight.append(createLightSphere()); //add sphere for debugging: since we use 0,0,0 as our light position the sphere is at the same position as the light source
     root.append(rotateLight);
-  }
-
-  {
-    //initialize C3PO
-    let c3po = new MaterialSGNode([ //use now framework implementation of material node
-      new RenderSGNode(resources.model)
-    ]);
-    //gold
-    c3po.ambient = [0.24725, 0.1995, 0.0745, 1];
-    c3po.diffuse = [0.75164, 0.60648, 0.22648, 1];
-    c3po.specular = [0.628281, 0.555802, 0.366065, 1];
-    c3po.shininess = 0.4;
-
-    rotateNode = new TransformationSGNode(mat4.create(), [
-      new TransformationSGNode(glm.transform({ translate: [0,1, 0], rotateX : 180, scale: 0.8 }),  [
-        c3po
-      ])
-    ]);
-    root.append(rotateNode);
   }
 
   {
@@ -129,7 +106,7 @@ function createSceneGraph(gl, resources) {
     floor.specular = [0.5, 0.5, 0.5, 1];
     floor.shininess = 50.0;
 
-    root.append(new TransformationSGNode(glm.transform({ translate: [0,1,0], rotateX: 90, scale: 1}), [
+    root.append(new TransformationSGNode(glm.transform({ translate: [0,1,0], rotateX: -90, scale: 1}), [
       floor
     ]));
   }
@@ -254,37 +231,8 @@ function makeFloor() {
   };
 }
 
-function renderToTexture(timeInMilliseconds)
-{
-  //TASK 5: Render C3PO to framebuffer/texture
-  //bind framebuffer to draw scene into texture
-  gl.bindFramebuffer(gl.FRAMEBUFFER, renderTargetFramebuffer);
-
-  //setup viewport
-  gl.viewport(0, 0, framebufferWidth, framebufferHeight);
-  gl.clearColor(0.9, 0.9, 0.9, 1.0);
-  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-  //setup context and camera matrices
-  const context = createSGContext(gl);
-  context.projectionMatrix = mat4.perspective(mat4.create(), 30, framebufferWidth / framebufferHeight, 0.01, 100);
-  context.viewMatrix = mat4.lookAt(mat4.create(), [0,-1,-4], [0,0,0], [0,1,0]);
-
-  //EXTRA TASK: animate texture coordinates
-  context.timeInMilliseconds = timeInMilliseconds;
-
-  //render scenegraph
-  rootnofloor.render(context);
-
-  //disable framebuffer (to render to screen again)
-  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-}
-
 function render(timeInMilliseconds) {
   checkForWindowResize(gl);
-
-  //render different scene to texture
-  renderToTexture(timeInMilliseconds);
 
   //setup viewport
   gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
@@ -293,9 +241,9 @@ function render(timeInMilliseconds) {
 
   //setup context and camera matrices
   const context = createSGContext(gl);
-  context.projectionMatrix = mat4.perspective(mat4.create(), 30, gl.drawingBufferWidth / gl.drawingBufferHeight, 0.01, 100);
+  context.projectionMatrix = mat4.perspective(mat4.create(), convertDegreeToRadians(45), gl.drawingBufferWidth / gl.drawingBufferHeight, 0.01, 100);
   //very primitive camera implementation
-  let lookAtMatrix = mat4.lookAt(mat4.create(), [0,-1,-4], [0,0,0], [0,1,0]);
+  let lookAtMatrix = mat4.lookAt(mat4.create(), [0,4,-4], [0,0.1,0], [0,1,0]);
   let mouseRotateMatrix = mat4.multiply(mat4.create(),
                           glm.rotateX(camera.rotation.y),
                           glm.rotateY(camera.rotation.x));
@@ -305,7 +253,6 @@ function render(timeInMilliseconds) {
   //EXTRA TASK: animate texture coordinates
   context.timeInMilliseconds = timeInMilliseconds;
 
-  rotateNode.matrix = glm.rotateY(timeInMilliseconds*-0.01);
   rotateLight.matrix = glm.rotateY(timeInMilliseconds*0.05);
 
   //render scenegraph
@@ -355,4 +302,8 @@ function initInteraction(canvas) {
   		camera.rotation.y = 0;
     }
   });
+}
+
+function convertDegreeToRadians(degree) {
+  return degree * Math.PI / 180
 }

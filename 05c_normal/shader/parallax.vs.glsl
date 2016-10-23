@@ -45,7 +45,7 @@ void main() {
   vec3 eyePosition = TBN * vec3( u_model * vec4(a_position,1) );
 	vec4 viewPosModel = ( u_invView[3] );
 	vec3 viewPos = TBN * (viewPosModel.xyz/viewPosModel.w);
-	vec3 lightPos = TBN * u_lightPos;
+	vec3 lightPos = TBN * vec3( u_invView * vec4(u_lightPos,1) );
 
   v_eyeVec = normalize( viewPos.xyz - eyePosition.xyz );
 	v_lightVec = normalize(lightPos - eyePosition.xyz);

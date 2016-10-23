@@ -31,20 +31,22 @@ varying vec3 v_eyeVec;
 varying vec3 v_lightVec;
 
 //texture related variables
-//TASK 1: define texture sampler and texture coordinates
 varying vec2 v_texCoord;
 uniform sampler2D u_diffuseTex;
 uniform bool u_diffuseTexEnabled;
 
 
-// input related to normal mapping
-varying mat3 v_TBN; // Tangent Binormal Normal Matrix
 
-
-vec4 calculateSimplePointLight(Light light, Material material, vec3 lightVec, vec3 normalVec, vec3 eyeVec, vec4 textureColor) {
+vec4 calculateSimplePointLight( Light light, Material material,
+	vec3 lightVec, vec3 normalVec, vec3 eyeVec,
+	bool useTexColor, vec4 texColor ) {
 	lightVec = normalize(lightVec);
 	normalVec = normalize(normalVec);
 	eyeVec = normalize(eyeVec);
+
+	if (useTexColor) {
+		material.diffuse = texColor;
+	}
 
 	//compute diffuse term
 	float diffuse = max(dot(normalVec,lightVec),0.0);
@@ -63,6 +65,13 @@ vec4 calculateSimplePointLight(Light light, Material material, vec3 lightVec, ve
 
 void main (void) {
 
-	gl_FragColor = calculateSimplePointLight(u_light, u_material, v_lightVec, v_normalVec, v_eyeVec, vec4(0,0,0,1));
+	vec4 diffuseTexColor = vec4(0.0);
+
+	if (u_diffuseTexEnabled) {
+		diffuseTexColor = texture2D(u_diffuseTex, v_texCoord);
+	}
+
+	gl_FragColor = calculateSimplePointLight(u_light, u_material, v_lightVec, v_normalVec,
+			v_eyeVec, u_diffuseTexEnabled, diffuseTexColor );
 
 }

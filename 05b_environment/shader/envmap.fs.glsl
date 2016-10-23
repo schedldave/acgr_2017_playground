@@ -1,6 +1,6 @@
 /**
  * simple environment mapping shader
- * Created by Clemens Birklbauer on 08.04.2016.
+ *
  */
 
 //need to specify how "precise" float should be
@@ -20,7 +20,6 @@ uniform samplerCube u_texCube;
 float fresnel(vec3 direction, vec3 normal) {
     vec3 nDirection = normalize( direction );
     vec3 nNormal = normalize( normal );
-    vec3 halfDirection = normalize( nNormal + nDirection );
 
     float cosine = dot( nNormal, nDirection );
     float product = max( cosine, 0.0 );
@@ -47,7 +46,6 @@ void main() {
   		texCoords  = reflect(cameraRayVec, normalVec);
       reflectColor = textureCube(u_texCube, texCoords);
       gl_FragColor = reflectColor;
-      //texCoords = vec3(0,0,0);
   }
   if(u_useRefraction)
   {
@@ -55,7 +53,6 @@ void main() {
       texCoords  = refract(cameraRayVec, normalVec, u_refractionEta);
       refractColor = textureCube(u_texCube, texCoords);
       gl_FragColor = refractColor;
-      //texCoords = vec3(0,0,0);
   }
 
   if(u_useFresnel)

@@ -30,12 +30,6 @@ varying vec3 v_normalVec;
 varying vec3 v_eyeVec;
 varying vec3 v_lightVec;
 
-//texture related variables
-//TASK 1: define texture sampler and texture coordinates
-varying vec2 v_texCoord;
-uniform sampler2D u_diffuseTex;
-uniform bool u_diffuseTexEnabled;
-
 
 
 vec4 calculateSimplePointLight(Light light, Material material, vec3 lightVec, vec3 normalVec, vec3 eyeVec) {
