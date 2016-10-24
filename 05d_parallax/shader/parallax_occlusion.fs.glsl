@@ -71,12 +71,57 @@ vec4 calculateSimplePointLight(Light light, Material material, vec3 lightVec, ve
   return c_amb + c_diff + c_spec + c_em;
 }
 
-// simplest version of parallax mapping
+// simples version of parallax mapping
 vec2 ParallaxMapping(vec2 texCoords, vec3 viewDir)
 {
     float height =  texture2D(u_heightTex, texCoords).r;
     vec2 p = viewDir.xy / viewDir.z * (height * height_scale);
     return texCoords - p;
+}
+
+vec2 ParallaxOcclusionMapping(vec2 texCoords, vec3 viewDir)
+{
+    // number of depth layers
+		const int numLayers = 64;
+
+		// calculate the size of each layer
+    float layerDepth = 1.0 / float(numLayers);
+    // depth of current layer
+    float currentLayerDepth = 0.0;
+    // the amount to shift the texture coordinates per layer (from vector P)
+    vec2 P = viewDir.xy / viewDir.z * height_scale;
+    vec2 deltaTexCoords = P / float(numLayers);
+
+    // get initial values
+    vec2  currentTexCoords     = texCoords;
+    float currentDepthMapValue = texture2D(u_heightTex, currentTexCoords).r;
+
+    for (int i = 0 ; i < numLayers; i ++)
+    {
+				if( currentLayerDepth >= currentDepthMapValue )
+					break;
+
+        // shift texture coordinates along direction of P
+        currentTexCoords -= deltaTexCoords;
+        // get depthmap value at current texture coordinates
+        currentDepthMapValue = texture2D(u_heightTex, currentTexCoords).r;
+        // get depth of next layer
+        currentLayerDepth += layerDepth;
+    }
+
+    // -- parallax occlusion mapping interpolation from here on
+    // get texture coordinates before collision (reverse operations)
+    vec2 prevTexCoords = currentTexCoords + deltaTexCoords;
+
+    // get depth after and before collision for linear interpolation
+    float afterDepth  = currentDepthMapValue - currentLayerDepth;
+    float beforeDepth = texture2D(u_heightTex, prevTexCoords).r - currentLayerDepth + layerDepth;
+
+    // interpolation of texture coordinates
+    float weight = afterDepth / (afterDepth - beforeDepth);
+    vec2 finalTexCoords = prevTexCoords * weight + currentTexCoords * (1.0 - weight);
+
+    return finalTexCoords;
 }
 
 void main (void) {
@@ -88,7 +133,7 @@ void main (void) {
 	if(u_heightTexEnabled)
 	{
 		// alter texture coordinates with parallax mapping
-		texCoords = ParallaxMapping(v_texCoord, normalize(v_eyeVec));
+		texCoords = ParallaxOcclusionMapping(v_texCoord, normalize(v_eyeVec));
 	}
 
   if(u_diffuseTexEnabled)

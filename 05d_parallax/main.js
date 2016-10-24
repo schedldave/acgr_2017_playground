@@ -29,8 +29,9 @@ var framebufferHeight = 512;
 
 //load the required resources using a utility function
 loadResources({
-  vs: 'shader/parallax.vs.glsl',
+  vs: 'shader/normal.vs.glsl',
   fs: 'shader/parallax.fs.glsl',
+  fs_occlusion: 'shader/parallax_occlusion.fs.glsl',
   vs_single: 'shader/single.vs.glsl',
   fs_single: 'shader/single.fs.glsl',
   texture_diffuse: 'models/wood.png',
@@ -84,8 +85,27 @@ function createSceneGraph(gl, resources) {
   }
 
   {
-    //initialize floor with parallax mapping
+    //initialize floor with advanced occlusion parallax mapping
+    let ofloor =
+            new MaterialSGNode(
+              new TextureSGNode(resources.texture_diffuse, 0, 'u_diffuseTex',
+                new TextureSGNode(resources.texture_normal, 1, 'u_normalTex',
+                  new TextureSGNode(resources.texture_height, 2, 'u_heightTex',
+                      new RenderSGNode(makeFloor(1,1))
+            ))));
 
+    //dark
+    ofloor.ambient = [0, 0, 0, 1];
+    ofloor.diffuse = [0.1, 0.1, 0.1, 1];
+    ofloor.specular = [0.5, 0.5, 0.5, 1];
+    ofloor.shininess = 50.0;
+
+    root.append(new TransformationSGNode(glm.transform({ translate: [-1,1,-1], rotateX: -90, scale: 1}), [
+      ofloor
+    ]));
+  }
+  {
+    //initialize floor with simple parallax mapping
     let floor = new MaterialSGNode(
                 new TextureSGNode(resources.texture_diffuse, 0, 'u_diffuseTex',
                   new TextureSGNode(resources.texture_normal, 1, 'u_normalTex',
@@ -99,9 +119,6 @@ function createSceneGraph(gl, resources) {
     floor.specular = [0.5, 0.5, 0.5, 1];
     floor.shininess = 50.0;
 
-    root.append(new TransformationSGNode(glm.transform({ translate: [-1,1,-1], rotateX: -90, scale: 1}), [
-      floor
-    ]));
     root.append(new TransformationSGNode(glm.transform({ translate: [ 1,1, 1], rotateX: -90, scale: 1}), [
       floor
     ]));
@@ -109,7 +126,6 @@ function createSceneGraph(gl, resources) {
 
   {
     //initialize floor with normal mapping
-
     let floor = new MaterialSGNode(
                 new TextureSGNode(resources.texture_diffuse, 0, 'u_diffuseTex',
                   new TextureSGNode(resources.texture_normal, 1, 'u_normalTex',
@@ -125,6 +141,19 @@ function createSceneGraph(gl, resources) {
     root.append(new TransformationSGNode(glm.transform({ translate: [-1,1,1], rotateX: -90, scale: 1}), [
       floor
     ]));
+  }
+  {
+    //initialize floor with diffuse only
+    let floor = new MaterialSGNode(
+                new TextureSGNode(resources.texture_diffuse, 0, 'u_diffuseTex',
+                    new RenderSGNode(makeFloor(1,1))
+                ));
+
+    //dark
+    floor.ambient = [0, 0, 0, 1];
+    floor.diffuse = [0.1, 0.1, 0.1, 1];
+    floor.specular = [0.5, 0.5, 0.5, 1];
+    floor.shininess = 50.0;
     root.append(new TransformationSGNode(glm.transform({ translate: [ 1,1,-1], rotateX: -90, scale: 1}), [
       floor
     ]));
@@ -168,7 +197,6 @@ function render(timeInMilliseconds) {
   context.viewMatrix = mat4.multiply(mat4.create(), lookAtMatrix, mouseRotateMatrix);
 
   //update animations
-  //EXTRA TASK: animate texture coordinates
   context.timeInMilliseconds = timeInMilliseconds;
 
   rotateLight.matrix = glm.rotateY(timeInMilliseconds*0.05);
