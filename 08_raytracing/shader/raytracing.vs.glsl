@@ -1,8 +1,6 @@
-// Phong Vertex Shader in Tangent Space
+// a basic raytracer implementation
 
 attribute vec3 a_position;
-attribute vec3 a_normal;
-attribute vec3 a_tangent;
 attribute vec2 a_texCoord;
 
 uniform mat4 u_model;
@@ -18,7 +16,6 @@ uniform vec3 u_lightPos;
 varying vec3 v_position;
 varying vec3 v_viewPos;
 varying vec3 v_lightPos;
-varying vec2 v_texCoord; // texture coordinates
 
 // there is no transpose in WebGL so use our own implementation:
 mat3 transpose(mat3 m) {
@@ -29,21 +26,11 @@ mat3 transpose(mat3 m) {
 
 void main() {
 
-  // forward texture coordinates
-  v_texCoord = a_texCoord;
-
-  mat4 VRot = u_view;
-  // erase the translation out of the View Matrix
-  VRot[3][0] = 0.0;
-  VRot[3][1] = 0.0;
-  VRot[3][2] = 0.0;
-
   // positions in world space:
-  v_viewPos = u_invView[3].xyz; //(viewPosModel.xyz/viewPosModel.w);
+  v_viewPos = u_invView[3].xyz; // ray origin
   v_lightPos = vec3( u_invView * vec4(u_lightPos,1) );
-  vec4 worldPos = u_invViewProjMatrix * vec4( a_position.xyz, 1.0 ); //
-  v_position = worldPos.xyz/worldPos.w - v_viewPos;
-  // WORKS:   v_position = vec3( a_position.xy, 1.0 ); //
+  vec4 worldPos = u_invViewProjMatrix * vec4( a_position.xyz, 1.0 );
+  v_position = worldPos.xyz/worldPos.w - v_viewPos; // ray direction
 
 
 	gl_Position = vec4(a_position, 1.0);

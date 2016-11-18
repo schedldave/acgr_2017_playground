@@ -18,6 +18,9 @@ var rotateLight;
 var rotateNode;
 
 //textures
+var envcubetexture;
+
+//textures
 var renderTargetColorTexture;
 var renderTargetDepthTexture;
 var floorTexture;
@@ -34,9 +37,17 @@ loadResources({
   fs_occlusion: 'shader/parallax_occlusion.fs.glsl',
   vs_single: 'shader/single.vs.glsl',
   fs_single: 'shader/single.fs.glsl',
+  vs_env: 'shader/envmap.vs.glsl',
+  fs_env: 'shader/envmap.fs.glsl',
   texture_diffuse: 'models/wood.png',
   texture_normal: 'models/toy_box_normal.png',
   texture_height: 'models/toy_box_disp.png',
+  env_pos_x: 'models/skybox/Galaxy_RT.jpg',
+  env_neg_x: 'models/skybox/Galaxy_LT.jpg',
+  env_pos_y: 'models/skybox/Galaxy_DN.jpg',
+  env_neg_y: 'models/skybox/Galaxy_UP.jpg',
+  env_pos_z: 'models/skybox/Galaxy_FT.jpg',
+  env_neg_z: 'models/skybox/Galaxy_BK.jpg',
 }).then(function (resources /*an object containing our keys with the loaded resources*/) {
   init(resources);
 
@@ -47,6 +58,7 @@ function init(resources) {
   //create a GL context
   gl = createContext();
 
+  initCubeMap(resources);
 
   gl.enable(gl.DEPTH_TEST);
 
@@ -92,8 +104,9 @@ function createSceneGraph(gl, resources) {
               new TextureSGNode(resources.texture_diffuse, 0, 'u_diffuseTex',
                 new TextureSGNode(resources.texture_normal, 1, 'u_normalTex',
                   new TextureSGNode(resources.texture_height, 2, 'u_heightTex',
-                      new RenderSGNode(makeFloor(1,1))
-            ))));
+                    new EnvironmentSGNode(envcubetexture,4,true,false,false,
+                        new RenderSGNode(makeFloor(1,1))
+            )))));
 
     //dark
     ofloor.ambient = [0, 0, 0, 1];
@@ -166,6 +179,25 @@ function createSceneGraph(gl, resources) {
     ]));
   }
 
+  {
+    //add skybox by putting large sphere around us
+    var skyboxshader = new ShaderSGNode(createProgram(gl, resources.vs_env, resources.fs_env));
+    var skybox = new EnvironmentSGNode(envcubetexture,4,false,false,false,
+                    new RenderSGNode(makeSphere(10)));
+    skyboxshader.append(skybox);
+    root.append(skyboxshader);
+  }
+
+  // {
+  //   //initialize
+  //   let sphere = new TransformationSGNode(glm.transform({ translate: [0,0, 0], rotateX : 0, rotateZ : 0, scale: 1.0 }),
+  //                  new EnvironmentSGNode(envcubetexture,4,true,true,true,
+  //                  new RenderSGNode(makeSphere(1))));
+  //                  //new RenderSGNode(resources.model)));
+  //
+  //   root.append(sphere);
+  // }
+
   return root;
 }
 
@@ -202,6 +234,9 @@ function render(timeInMilliseconds) {
                           glm.rotateX(camera.rotation.y),
                           glm.rotateY(camera.rotation.x));
   context.viewMatrix = mat4.multiply(mat4.create(), lookAtMatrix, mouseRotateMatrix);
+
+  //get inverse view matrix to allow to compute viewing direction in world space for environment mapping
+  context.invViewMatrix = mat4.invert(mat4.create(), context.viewMatrix);
 
   //update animations
   context.timeInMilliseconds = timeInMilliseconds;
@@ -259,4 +294,71 @@ function initInteraction(canvas) {
 
 function convertDegreeToRadians(degree) {
   return degree * Math.PI / 180
+}
+
+function initCubeMap(resources) {
+  //create the texture
+  envcubetexture = gl.createTexture();
+  //define some texture unit we want to work on
+  gl.activeTexture(gl.TEXTURE0);
+  //bind the texture to the texture unit
+  gl.bindTexture(gl.TEXTURE_CUBE_MAP, envcubetexture);
+  //set sampling parameters
+  gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_S, gl.MIRRORED_REPEAT);
+  gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_T, gl.MIRRORED_REPEAT);
+  //gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_R, gl.MIRRORED_REPEAT); //will be available in WebGL 2
+  gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  //set correct image for each side of the cube map
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);//flipping required for our skybox, otherwise images don't fit together
+  gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_X, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, resources.env_pos_x);
+  gl.texImage2D(gl.TEXTURE_CUBE_MAP_NEGATIVE_X, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, resources.env_neg_x);
+  gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_Y, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, resources.env_pos_y);
+  gl.texImage2D(gl.TEXTURE_CUBE_MAP_NEGATIVE_Y, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, resources.env_neg_y);
+  gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_Z, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, resources.env_pos_z);
+  gl.texImage2D(gl.TEXTURE_CUBE_MAP_NEGATIVE_Z, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, resources.env_neg_z);
+  //generate mipmaps (optional)
+  gl.generateMipmap(gl.TEXTURE_CUBE_MAP);
+  //unbind the texture again
+  gl.bindTexture(gl.TEXTURE_CUBE_MAP, null);
+}
+
+//a scene graph node for setting environment mapping parameters
+class EnvironmentSGNode extends SGNode {
+
+  constructor(envtexture, textureunit, doReflect, doRefract, useFresnel, children ) {
+      super(children);
+      this.envtexture = envtexture;
+      this.textureunit = textureunit;
+      this.doReflect = doReflect;
+      this.doRefract = doRefract;
+      this.useFresnel = useFresnel;
+      this.n2 = 1.55; // glass
+      this.n1 = 1.0;  // air
+  }
+
+  render(context)
+  {
+    //set additional shader parameters
+    let invView3x3 = mat3.fromMat4(mat3.create(), context.invViewMatrix); //reduce to 3x3 matrix since we only process direction vectors (ignore translation)
+    gl.uniformMatrix3fv(gl.getUniformLocation(context.shader, 'u_invView'), false, invView3x3);
+    gl.uniform1i(gl.getUniformLocation(context.shader, 'u_texCube'), this.textureunit);
+    gl.uniform1i(gl.getUniformLocation(context.shader, 'u_useReflection'), this.doReflect);
+    gl.uniform1i(gl.getUniformLocation(context.shader, 'u_useRefraction'), this.doRefract);
+    gl.uniform1i(gl.getUniformLocation(context.shader, 'u_useFresnel'), this.useFresnel);
+    gl.uniform1f(gl.getUniformLocation(context.shader, 'u_refractionEta'), this.n1/this.n2);
+    gl.uniform1f(gl.getUniformLocation(context.shader, 'u_fresnelR0'), Math.pow((this.n1-this.n2)/(this.n1+this.n2),2));
+
+
+    //activate and bind texture
+    gl.activeTexture(gl.TEXTURE0 + this.textureunit);
+    gl.bindTexture(gl.TEXTURE_CUBE_MAP, this.envtexture);
+
+    //render children
+    super.render(context);
+
+    //clean up
+    gl.activeTexture(gl.TEXTURE0 + this.textureunit);
+    gl.bindTexture(gl.TEXTURE_CUBE_MAP, null);
+  }
 }

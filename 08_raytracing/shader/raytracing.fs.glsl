@@ -1,71 +1,26 @@
 /**
- * a phong shader implementation with texture support
+ * a basic raytracer implementation
  */
 precision mediump float;
 
-/**
- * definition of the light properties related to material properties
- */
-struct Light {
-	vec4 ambient;
-	vec4 diffuse;
-	vec4 specular;
-};
-
-//illumination related variables
-uniform Light u_light;
 
 // input from vertex shader
 varying vec3 v_position;
 varying vec3 v_viewPos;
 varying vec3 v_lightPos;
-varying vec2 v_texCoord; // texture coordinates
 
 //texture related variables
-uniform sampler2D u_diffuseTex;
-uniform bool u_diffuseTexEnabled;
-uniform sampler2D u_normalTex;
-uniform bool u_normalTexEnabled;
-// for parallax mapping
-uniform sampler2D u_heightTex;
-uniform bool u_heightTexEnabled;
+// uniform sampler2D u_diffuseTex;
+// uniform bool u_diffuseTexEnabled;
 
-//uniform float height_scale;
-const float height_scale = 0.05;
-
-
-// vec4 calculateSimplePointLight(Light light, Material material, vec3 lightVec, vec3 normalVec, vec3 eyeVec, vec4 textureColor) {
-// 	lightVec = normalize(lightVec);
-// 	normalVec = normalize(normalVec);
-// 	eyeVec = normalize(eyeVec);
-//
-// 	//compute diffuse term
-// 	float diffuse = clamp(dot(normalVec,lightVec), 0.0, 1.0);
-//
-// 	//compute specular term
-// 	vec3 reflectVec = reflect(-lightVec,normalVec);
-// 	float spec = pow( max( dot(reflectVec, eyeVec), 0.0) , material.shininess);
-//
-//   if(u_diffuseTexEnabled)
-//   {
-//     material.diffuse = textureColor;
-//     material.ambient = textureColor;
-// 		//Note: an alternative to replacing the material color is to multiply it with the texture color
-//   }
-//
-// 	vec4 c_amb  = clamp(light.ambient * material.ambient, 0.0, 1.0);
-// 	vec4 c_diff = clamp(diffuse * light.diffuse * material.diffuse, 0.0, 1.0);
-// 	vec4 c_spec = clamp(spec * light.specular * material.specular, 0.0, 1.0);
-// 	vec4 c_em   = material.emission;
-//
-//   return c_amb + c_diff + c_spec + c_em;
-// }
 
 // CONSTANTS/DEFINE
 #define INFINITY 100000.0
 #define RAY_OFFSET 0.0001
 #define MAX_DEPTH 3
 
+
+// PLANE -----------------------------------------------------------------------
 float rayPlaneIntersection(vec3 rayStart, vec3 rayDir, vec4 plane, out vec3 hitColor)
 {
 	vec3 planeNormal = plane.xyz;
@@ -86,7 +41,7 @@ void addPlane( vec3 ro, vec3 rd, vec4 plane,
 		inout float hitDist, inout vec3 hitColor, inout vec3 hitNormal ){
 	vec3 planeColor = vec3(0.0);
 	float dist = rayPlaneIntersection(ro, rd, plane, planeColor);
-	if( dist < hitDist ){
+	if( dist < hitDist && dot(rd,-normalize( plane.xyz )) >= 0.0 ){
 		hitDist = dist;
 		hitColor = planeColor;
 		hitNormal = normalize( plane.xyz );
@@ -94,6 +49,7 @@ void addPlane( vec3 ro, vec3 rd, vec4 plane,
 }
 
 
+// SPHERE ----------------------------------------------------------------------
 //The intersection function for a sphere looks like this:
 float intersectSphere(vec3 origin, vec3 ray, vec3 sphereCenter, float sphereRadius) {
 	vec3 toSphere = origin - sphereCenter;
@@ -127,7 +83,7 @@ void addSphere( vec3 ro, vec3 rd,
 }
 
 
-
+// CUBE ------------------------------------------------------------------------
 vec3 normalForCube(vec3 hit, vec3 cubeMin, vec3 cubeMax)
 {
 	if(hit.x < cubeMin.x + RAY_OFFSET) return vec3(-1.0, 0.0, 0.0);
@@ -163,6 +119,7 @@ void addCube( vec3 ro, vec3 rd,
 	}
 }
 
+// SCENE ------------------------------------------------------------------------
 // scene descriptions
 float rayTraceScene(vec3 ro /*rayStart*/, vec3 rd /*rayDirection*/, out vec3 hitNormal, out vec3 hitColor)
 {
@@ -197,6 +154,7 @@ float rayTraceScene(vec3 ro /*rayStart*/, vec3 rd /*rayDirection*/, out vec3 hit
 	return hitDist;
 }
 
+// LIGHTING --------------------------------------------------------------------
 float calcFresnel(vec3 normal, vec3 inRay) {
 	float bias = 0.1;
 	float scale = 1.0;
@@ -265,7 +223,3 @@ void main() {
   // DEBUG Stuff
 	//gl_FragColor.rgb = rayDirection;
 }
-
-
-// TRY:
-//https://github.com/LWJGL/lwjgl3-wiki/wiki/2.6.1.-Ray-tracing-with-OpenGL-Compute-Shaders-(Part-I)

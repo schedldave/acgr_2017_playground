@@ -29,10 +29,14 @@ var framebufferHeight = 512;
 
 //load the required resources using a utility function
 loadResources({
-  vs: 'shader/raytracing.vs.glsl',
-  fs: 'shader/raytracing.fs.glsl',
+  vs: 'shader/normal.vs.glsl',
+  fs: 'shader/parallax.fs.glsl',
+  fs_occlusion: 'shader/parallax_occlusion.fs.glsl',
+  vs_single: 'shader/single.vs.glsl',
+  fs_single: 'shader/single.fs.glsl',
   texture_diffuse: 'models/wood.png',
   texture_normal: 'models/toy_box_normal.png',
+  texture_height: 'models/toy_box_disp.png',
 }).then(function (resources /*an object containing our keys with the loaded resources*/) {
   init(resources);
 
@@ -56,40 +60,111 @@ function createSceneGraph(gl, resources) {
   //create scenegraph
   const root = new ShaderSGNode(createProgram(gl, resources.vs, resources.fs));
 
+  //light debug helper function
+  function createLightSphere() {
+    return new ShaderSGNode(createProgram(gl, resources.vs_single, resources.fs_single), [
+      new RenderSGNode(makeSphere(.2,10,10))
+    ]);
+  }
+
   {
     //initialize light
-    var light = new LightSGNode(); //use now framework implementation of light node
+    let light = new LightSGNode(); //use now framework implementation of light node
     light.ambient = [0.2, 0.2, 0.2, 1];
     light.diffuse = [0.8, 0.8, 0.8, 1];
     light.specular = [1, 1, 1, 1];
     light.position = [0, 0, 0];
 
     rotateLight = new TransformationSGNode(mat4.create());
-    let translateLight = new TransformationSGNode(glm.translate(0,3,2)); //translating the light is the same as setting the light position
+    let translateLight = new TransformationSGNode(glm.translate(0,2,2)); //translating the light is the same as setting the light position
 
     rotateLight.append(translateLight);
     translateLight.append(light);
-    //translateLight.append(createLightSphere()); //add sphere for debugging: since we use 0,0,0 as our light position the sphere is at the same position as the light source
+    translateLight.append(createLightSphere()); //add sphere for debugging: since we use 0,0,0 as our light position the sphere is at the same position as the light source
     root.append(rotateLight);
   }
 
   {
-    //initialize screen quad
-    let quad = new MaterialSGNode(
+    //initialize floor with advanced occlusion parallax mapping
+    let ofloor =
+            new MaterialSGNode(
+              new TextureSGNode(resources.texture_diffuse, 0, 'u_diffuseTex',
+                new TextureSGNode(resources.texture_normal, 1, 'u_normalTex',
+                  new TextureSGNode(resources.texture_height, 2, 'u_heightTex',
+                      new RenderSGNode(makeFloor(1,1))
+            ))));
+
+    //dark
+    ofloor.ambient = [0, 0, 0, 1];
+    ofloor.diffuse = [0.1, 0.1, 0.1, 1];
+    ofloor.specular = [0.5, 0.5, 0.5, 1];
+    ofloor.shininess = 50.0;
+
+    root.append(new TransformationSGNode(glm.transform({ translate: [-1,1,-1], rotateX: -90, scale: 1}), [
+      ofloor
+    ]));
+  }
+  {
+    //initialize floor with simple parallax mapping
+    let floor = new MaterialSGNode(
                 new TextureSGNode(resources.texture_diffuse, 0, 'u_diffuseTex',
-                    new RenderSGNode(makeScreenQuad(1,1))
+                  new TextureSGNode(resources.texture_normal, 1, 'u_normalTex',
+                    new TextureSGNode(resources.texture_height, 2, 'u_heightTex',
+                      new RenderSGNode(makeFloor(1,1))
+                ))));
+
+    //dark
+    floor.ambient = [0, 0, 0, 1];
+    floor.diffuse = [0.1, 0.1, 0.1, 1];
+    floor.specular = [0.5, 0.5, 0.5, 1];
+    floor.shininess = 50.0;
+
+    root.append(new TransformationSGNode(glm.transform({ translate: [ 1,1, 1], rotateX: -90, scale: 1}), [
+      floor
+    ]));
+  }
+
+  {
+    //initialize floor with normal mapping
+    let floor = new MaterialSGNode(
+                new TextureSGNode(resources.texture_diffuse, 0, 'u_diffuseTex',
+                  new TextureSGNode(resources.texture_normal, 1, 'u_normalTex',
+                    new RenderSGNode(makeFloor(1,1))
+                )));
+
+    //dark
+    floor.ambient = [0, 0, 0, 1];
+    floor.diffuse = [0.1, 0.1, 0.1, 1];
+    floor.specular = [0.5, 0.5, 0.5, 1];
+    floor.shininess = 50.0;
+
+    root.append(new TransformationSGNode(glm.transform({ translate: [-1,1,1], rotateX: -90, scale: 1}), [
+      floor
+    ]));
+  }
+  {
+    //initialize floor with diffuse only
+    let floor = new MaterialSGNode(
+                new TextureSGNode(resources.texture_diffuse, 0, 'u_diffuseTex',
+                    new RenderSGNode(makeFloor(1,1))
                 ));
 
-    root.append( quad);
+    //dark
+    floor.ambient = [0, 0, 0, 1];
+    floor.diffuse = [0.1, 0.1, 0.1, 1];
+    floor.specular = [0.5, 0.5, 0.5, 1];
+    floor.shininess = 50.0;
+    root.append(new TransformationSGNode(glm.transform({ translate: [ 1,1,-1], rotateX: -90, scale: 1}), [
+      floor
+    ]));
   }
 
   return root;
 }
 
-
-function makeScreenQuad() {
-  var width = 1;
-  var height = 1;
+function makeFloor(w, h) {
+  var width = w || 2;
+  var height = h || 2;
   var position = [-width, -height, 0,   width, -height, 0,   width, height, 0,   -width, height, 0];
   var normal = [0, 0, 1,   0, 0, 1,   0, 0, 1,   0, 0, 1];
   var texturecoordinates = [0, 0,   1, 0,   1, 1,   0, 1];
@@ -115,7 +190,7 @@ function render(timeInMilliseconds) {
   const context = createSGContext(gl);
   context.projectionMatrix = mat4.perspective(mat4.create(), convertDegreeToRadians(45), gl.drawingBufferWidth / gl.drawingBufferHeight, 0.01, 100);
   //very primitive camera implementation
-  let lookAtMatrix = mat4.lookAt(mat4.create(), [0,1,-10], [0,0,0], [0,1,0]);
+  let lookAtMatrix = mat4.lookAt(mat4.create(), [0,4,-4], [0,0.1,0], [0,1,0]);
   let mouseRotateMatrix = mat4.multiply(mat4.create(),
                           glm.rotateX(camera.rotation.y),
                           glm.rotateY(camera.rotation.x));
