@@ -95,10 +95,11 @@ function loadResources(resources, callback) {
  * @param height
  * @returns {WebGLRenderingContext}
  */
-function createContext(width, height) {
+function createContext(width, height, isFixed) {
   var canvas = document.createElement('canvas');
   canvas.width = width || 400;
   canvas.height = height || 400;
+  canvas.sizeFixed = isFixed || false;
   document.body.appendChild(canvas);
   return canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
 }
@@ -156,8 +157,9 @@ function createProgram(gl, vertex, fragment) {
 function checkForWindowResize(gl) {
   var width = gl.canvas.clientWidth;
   var height = gl.canvas.clientHeight;
-  if (gl.canvas.width != width ||
-    gl.canvas.height != height) {
+  if ( !gl.canvas.sizeFixed &&
+      ( gl.canvas.width != width ||
+        gl.canvas.height != height)) {
     gl.canvas.width = width;
     gl.canvas.height = height;
   }
