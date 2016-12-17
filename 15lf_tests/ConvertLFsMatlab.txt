@@ -1,0 +1,4 @@
+LF = lf.getLightFieldData(); or ImportLF()
+[T,S,C,U,V] = size( LF );
+lfpersp = reshape( permute( LF, [1 5 2 4 3] ), [T*U,S*V,C] );
+%figure; imshow( lfpersp );
